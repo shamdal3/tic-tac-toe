@@ -1,9 +1,11 @@
 public class TicTacToe {
     public static void main(String[] args) {
         char[][] board = {
-            {' ', ' ', ' '},
-            {' ', ' ', ' '},
-            {' ', ' ', ' '}
+            {' ', '|', ' ', '|', ' '},
+            {'-', '+', '-', '+', '-'},
+            {' ', '|', ' ', '|', ' '},
+            {'-', '+', '-', '+', '-'},
+            {' ', '|', ' ', '|', ' '},
         };
 
         java.util.Scanner scanner = new java.util.Scanner(System.in);
@@ -82,5 +84,6 @@ public class TicTacToe {
         return true;
     }
 }
+
 
 
