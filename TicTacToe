@@ -84,6 +84,205 @@ public class TicTacToe {
         return true;
     }
 }
+public interface IView {
+    void render(char[][] board);
+    void message(String text);
+    /** Returns a 0-based {row, col} move or null to quit. */
+    int[] readHumanMove();
+}
 
+import java.util.InputMismatchException;
+import java.util.Scanner;
 
+public class ConsoleView implements IView {
+    private final Scanner in = new Scanner(System.in);
+
+    @Override
+    public void render(char[][] b) {
+        System.out.println();
+        for (int i = 0; i < 3; i++) {
+            System.out.printf(" %c | %c | %c %n",
+                    cell(b[i][0]), cell(b[i][1]), cell(b[i][2]));
+            if (i < 2) System.out.println("---+---+---");
+        }
+        System.out.println();
+    }
+
+    @Override
+    public void message(String text) {
+        System.out.println(text);
+    }
+
+    @Override
+    public int[] readHumanMove() {
+        while (true) {
+            System.out.print("Enter your move as 'row col' (1-3 1-3) or 'q' to quit: ");
+            String line = in.nextLine().trim();
+            if (line.equalsIgnoreCase("q")) return null;
+            String[] parts = line.split("\\s+");
+            if (parts.length != 2) { System.out.println("Please enter two numbers."); continue; }
+            try {
+                int r = Integer.parseInt(parts[0]) - 1;
+                int c = Integer.parseInt(parts[1]) - 1;
+                if (r < 0 || r > 2 || c < 0 || c > 2) { System.out.println("Values must be 1..3."); continue; }
+                return new int[]{r, c};
+            } catch (NumberFormatException | InputMismatchException e) {
+                System.out.println("Invalid numbers. Try again.");
+            }
+        }
+    }
+
+    private char cell(char v) { return v == '\0' ? ' ' : v; }
+}
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+public class AIPlayer {
+    private final char ai;           // e.g., 'O'
+    private final char human;        // e.g., 'X'
+    private final Random rng = new Random();
+
+    public AIPlayer(char ai, char human) {
+        this.ai = ai;
+        this.human = human;
+    }
+
+    /** Returns {row,col}. Assumes there is at least one legal move. */
+    public int[] nextMove(char[][] board) {
+        List<int[]> empty = new ArrayList<>();
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 3; c++)
+                if (board[r][c] == '\0') empty.add(new int[]{r, c});
+        return empty.get(rng.nextInt(empty.size()));
+    }
+}
+public class Minimax {
+    private final char ai;     // AI mark
+    private final char opp;    // Opponent mark
+
+    public Minimax(char ai, char opp) {
+        this.ai = ai;
+        this.opp = opp;
+    }
+
+    /** Best move for AI as {row, col}. */
+    public int[] bestMove(char[][] b) {
+        int bestScore = Integer.MIN_VALUE;
+        int[] best = null;
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                if (b[r][c] == '\0') {
+                    b[r][c] = ai;
+                    int score = minimax(b, false, 0);
+                    b[r][c] = '\0';
+                    if (score > bestScore) { bestScore = score; best = new int[]{r, c}; }
+                }
+            }
+        }
+        return best;
+    }
+
+    private int minimax(char[][] b, boolean isMax, int depth) {
+        Character w = winner(b);
+        if (w != null) {
+            if (w == ai)   return 10 - depth;
+            if (w == opp)  return depth - 10;
+            return 0; // draw
+        }
+        if (isMax) {
+            int best = Integer.MIN_VALUE;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    if (b[r][c] == '\0') {
+                        b[r][c] = ai;
+                        best = Math.max(best, minimax(b, false, depth + 1));
+                        b[r][c] = '\0';
+                    }
+            return best;
+        } else {
+            int best = Integer.MAX_VALUE;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    if (b[r][c] == '\0') {
+                        b[r][c] = opp;
+                        best = Math.min(best, minimax(b, true, depth + 1));
+                        b[r][c] = '\0';
+                    }
+            return best;
+        }
+    }
+
+    private Character winner(char[][] b) {
+        // rows/cols
+        for (int i = 0; i < 3; i++) {
+            if (b[i][0] != '\0' && b[i][0] == b[i][1] && b[i][1] == b[i][2]) return b[i][0];
+            if (b[0][i] != '\0' && b[0][i] == b[1][i] && b[1][i] == b[2][i]) return b[0][i];
+        }
+        // diagonals
+        if (b[1][1] != '\0' && ((b[0][0] == b[1][1] && b[1][1] == b[2][2]) || (b[0][2] == b[1][1] && b[1][1] == b[2][0])))
+            return b[1][1];
+        // draw?
+        boolean any = false;
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 3; c++)
+                if (b[r][c] == '\0') any = true;
+        return any ? null : 'D';
+    }
+}
+public class TicTacToe {
+    public static void main(String[] args) {
+        char[][] board = new char[3][3]; // '\0' means empty
+        char human = 'X';
+        char ai    = 'O';
+
+        IView view = new ConsoleView();
+
+        // Choose one:
+        // AIPlayer randomAI = new AIPlayer(ai, human);
+        Minimax mini = new Minimax(ai, human);
+
+        char current = human;
+        while (true) {
+            view.render(board);
+            Character result = checkTerminal(board);
+            if (result != null) {
+                if (result == 'D') view.message("It's a draw!");
+                else view.message("Player " + result + " wins!");
+                break;
+            }
+
+            if (current == human) {
+                int[] mv = view.readHumanMove();
+                if (mv == null) { view.message("Goodbye!"); break; }
+                if (board[mv[0]][mv[1]] != '\0') { view.message("Cell occupied. Try again."); continue; }
+                board[mv[0]][mv[1]] = human;
+                current = ai;
+            } else {
+                // int[] mv = randomAI.nextMove(board); // basic AI
+                int[] mv = mini.bestMove(board);        // unbeatable AI
+                board[mv[0]][mv[1]] = ai;
+                current = human;
+                view.message("AI played: " + (mv[0] + 1) + " " + (mv[1] + 1));
+            }
+        }
+    }
+
+    private static Character checkTerminal(char[][] b) {
+        // rows/cols
+        for (int i = 0; i < 3; i++) {
+            if (b[i][0] != '\0' && b[i][0] == b[i][1] && b[i][1] == b[i][2]) return b[i][0];
+            if (b[0][i] != '\0' && b[0][i] == b[1][i] && b[1][i] == b[2][i]) return b[0][i];
+        }
+        // diagonals
+        if (b[1][1] != '\0' && ((b[0][0] == b[1][1] && b[1][1] == b[2][2]) || (b[0][2] == b[1][1] && b[1][1] == b[2][0])))
+            return b[1][1];
+        // draw?
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 3; c++)
+                if (b[r][c] == '\0') return null;
+        return 'D';
+    }
+}
 
